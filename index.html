@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Evaluador de episodios</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #000000;
+        --panel: #0a0a0a;
+        --panel-2: #141414;
+        --line: rgba(230, 184, 74, 0.28);
+        --track: rgba(255, 255, 255, 0.14);
+        --gold: #e6b84a;
+        --gold-soft: #f6dc98;
+        --gold-deep: #b98a1f;
+        --text: #eeeeee;
+        --muted: #8d8d8d;
+        --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+        --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+        /* medidas que se adaptan a la ventana para que todo quepa sin scroll */
+        --gap: clamp(10px, 2dvh, 22px);
+        --pad-y: clamp(14px, 3.2dvh, 36px);
+        --pad-x: clamp(20px, 2.8vw, 54px);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding: var(--gap);
+        display: grid;
+        /* proporciones del wireframe */
+        grid-template-columns: 1262fr 600fr;
+        grid-template-rows: 390fr 636fr;
+        grid-template-areas:
+          "notas   resumen"
+          "criterios criterios";
+        gap: var(--gap);
+        color: var(--text);
+        font-family: var(--body);
+        background:
+          radial-gradient(
+            800px 500px at 100% 115%,
+            rgba(230, 184, 74, 0.12) 0%,
+            transparent 70%
+          ),
+          radial-gradient(
+            700px 400px at 0% -10%,
+            rgba(255, 255, 255, 0.05) 0%,
+            transparent 70%
+          ),
+          var(--bg);
+        background-attachment: fixed;
+      }
+
+      .panel {
+        position: relative;
+        background: linear-gradient(
+          180deg,
+          var(--panel-2) 0%,
+          var(--panel) 100%
+        );
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow:
+          0 24px 60px -30px rgba(0, 0, 0, 0.9),
+          inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        padding: var(--pad-y) var(--pad-x);
+        min-width: 0;
+        min-height: 0;
+      }
+
+      /* filete dorado en el borde superior de cada panel */
+      .panel::before {
+        content: "";
+        position: absolute;
+        top: -1px;
+        left: var(--pad-x);
+        right: var(--pad-x);
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--gold),
+          transparent
+        );
+        border-radius: 2px;
+      }
+
+      /* ---------- Notas generales ---------- */
+      .notas {
+        grid-area: notas;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .notas:focus-within {
+        border-color: var(--gold);
+        box-shadow:
+          0 0 0 3px rgba(230, 184, 74, 0.14),
+          0 24px 60px -30px rgba(0, 0, 0, 0.9);
+      }
+
+      .apuntes {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: 90px;
+        resize: none;
+        background: transparent;
+        border: 0;
+        padding: 0;
+        color: var(--text);
+        font-family: var(--body);
+        font-size: clamp(16px, 2.3dvh, 21px);
+        line-height: 1.6;
+        outline: none;
+      }
+      .apuntes::placeholder {
+        color: var(--muted);
+        opacity: 0.8;
+      }
+
+      /* ---------- Total y botón ---------- */
+      .resumen {
+        grid-area: resumen;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(14px, 4dvh, 44px);
+      }
+
+      .total {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 10px;
+        font-family: var(--display);
+        color: var(--gold);
+        line-height: 1;
+      }
+      .total input {
+        width: 4.6ch;
+        background: transparent;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        padding: 0 0 4px;
+        text-align: right;
+        font: 700 clamp(38px, 7.4dvh, 84px)/1 var(--display);
+        color: var(--gold);
+        outline: none;
+        font-variant-numeric: tabular-nums;
+        transition: border-color 0.2s;
+      }
+      .total input:hover {
+        border-bottom-color: var(--line);
+      }
+      .total input:focus {
+        border-bottom-color: var(--gold);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .total .de {
+        font-weight: 500;
+        font-size: clamp(24px, 4.6dvh, 50px);
+        color: var(--muted);
+      }
+
+      .btn-copiar {
+        appearance: none;
+        cursor: pointer;
+        width: min(100%, 390px);
+        padding: clamp(12px, 3dvh, 30px) 20px;
+        border-radius: 12px;
+        border: 2px solid transparent;
+        font-family: var(--body);
+        font-weight: 600;
+        font-size: clamp(16px, 2.8dvh, 27px);
+        color: #1c1500;
+        background: linear-gradient(
+          180deg,
+          var(--gold-soft) 0%,
+          var(--gold) 55%,
+          var(--gold-deep) 100%
+        );
+        box-shadow:
+          0 10px 26px -12px rgba(230, 184, 74, 0.75),
+          inset 0 1px 0 rgba(255, 255, 255, 0.45);
+        transition:
+          transform 0.12s,
+          filter 0.15s,
+          background 0.2s,
+          color 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .btn-copiar:hover {
+        filter: brightness(1.06);
+      }
+      .btn-copiar:active {
+        transform: translateY(1px);
+      }
+      .btn-copiar.ok {
+        background: #cfe9c2;
+        color: #12351c;
+        box-shadow: none;
+      }
+      .btn-copiar.error {
+        background: #f0c4c4;
+        color: #4a1010;
+        box-shadow: none;
+      }
+
+      .acciones {
+        width: min(100%, 390px);
+        display: flex;
+        flex-direction: column;
+        gap: clamp(8px, 1.6dvh, 16px);
+      }
+      .acciones .btn-copiar {
+        width: 100%;
+      }
+
+      .btn-reiniciar {
+        appearance: none;
+        cursor: pointer;
+        width: 100%;
+        padding: clamp(8px, 1.6dvh, 16px) 20px;
+        border-radius: 12px;
+        border: 2px solid var(--gold-deep);
+        background: transparent;
+        font-family: var(--body);
+        font-weight: 600;
+        font-size: clamp(14px, 2.1dvh, 20px);
+        color: var(--gold-soft);
+        transition:
+          transform 0.12s,
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .btn-reiniciar:hover {
+        background: rgba(230, 184, 74, 0.1);
+      }
+      .btn-reiniciar:active {
+        transform: translateY(1px);
+      }
+      .btn-reiniciar.confirmar {
+        border-color: #e07a5f;
+        color: #ffb4a0;
+        background: rgba(224, 122, 95, 0.12);
+      }
+
+      /* ---------- Criterios ---------- */
+      .evaluacion {
+        grid-area: criterios;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Dos columnas de 6 filas; cada fila mide 1/6 de la altura libre */
+      .criterios {
+        flex: 1;
+        min-height: 330px;
+        container-type: size;
+        display: grid;
+        grid-auto-flow: column;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: repeat(6, minmax(0, 1fr));
+        column-gap: clamp(28px, 5vw, 96px);
+      }
+
+      .fila {
+        --aro: clamp(34px, calc(100cqh / 6 * 0.72), 72px);
+        --btn: clamp(24px, calc(var(--aro) * 0.55), 38px);
+        --th: clamp(22px, calc(100cqh / 6 * 0.45), 40px);
+        --tr: clamp(6px, calc(var(--th) * 0.25), 10px);
+
+        min-height: 0;
+        display: grid;
+        /* etiqueta : barra ~ 1 : 1.85, como en el wireframe */
+        grid-template-columns: var(--aro) minmax(96px, 0.55fr) var(
+            --btn
+          ) minmax(0, 1fr) var(--btn);
+        align-items: center;
+        column-gap: clamp(8px, 1vw, 18px);
+      }
+
+      .aro {
+        --p: 0;
+        width: var(--aro);
+        height: var(--aro);
+        padding: 4px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: conic-gradient(
+          var(--gold) calc(var(--p) * 1%),
+          var(--track) 0
+        );
+        transition: box-shadow 0.15s;
+      }
+      .aro:focus-within {
+        box-shadow: 0 0 0 3px rgba(246, 220, 152, 0.4);
+      }
+      .aro input {
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: var(--panel);
+        text-align: center;
+        font: 600 max(10px, calc(var(--aro) * 0.26))/1 var(--display);
+        color: var(--gold-soft);
+        font-variant-numeric: tabular-nums;
+        cursor: text;
+        outline: none;
+      }
+      .aro input:focus {
+        background: #1b1b1b;
+      }
+
+      .nombre {
+        font-size: clamp(14px, 2.2dvh, 23px);
+        font-weight: 500;
+        line-height: 1.15;
+      }
+
+      .flecha {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        width: var(--btn);
+        height: var(--btn);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        border-radius: 8px;
+        touch-action: manipulation;
+        user-select: none;
+        transition: background 0.15s;
+      }
+      .flecha::before {
+        content: "";
+        width: calc(var(--btn) * 0.47);
+        height: calc(var(--btn) * 0.53);
+        background: var(--gold);
+        transition:
+          transform 0.12s,
+          background 0.15s;
+      }
+      .flecha.menos::before {
+        clip-path: polygon(100% 0, 0 50%, 100% 100%);
+      }
+      .flecha.mas::before {
+        clip-path: polygon(0 0, 100% 50%, 0 100%);
+      }
+      .flecha:hover {
+        background: rgba(230, 184, 74, 0.12);
+      }
+      .flecha:active::before {
+        transform: scale(0.88);
+        background: var(--gold-soft);
+      }
+      .flecha:focus-visible {
+        outline: 2px solid var(--gold-soft);
+        outline-offset: 1px;
+      }
+
+      /* Pista: el deslizador + las marcas de posición rápida */
+      .pista {
+        position: relative;
+        width: 100%;
+      }
+
+      .marcas {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        pointer-events: none;
+      }
+      .marca {
+        position: absolute;
+        left: 0;
+        bottom: calc(50% + var(--tr) / 2);
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 0 6px;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+      .marca-num {
+        font: 600 clamp(9px, calc(var(--aro) * 0.19), 12px)/1 var(--body);
+        color: var(--muted);
+        user-select: none;
+        transition:
+          color 0.15s,
+          transform 0.15s;
+      }
+      .marca-linea {
+        width: 2px;
+        height: 6px;
+        border-radius: 1px;
+        background: var(--track);
+        transition:
+          height 0.15s,
+          background-color 0.15s;
+      }
+      /* Al pasar el cursor (sobre el número o la línea), la línea se alarga como marcando el punto */
+      .marca:hover .marca-linea,
+      .marca:focus-visible .marca-linea {
+        height: 15px;
+        background: var(--gold);
+      }
+      .marca:hover .marca-num,
+      .marca:focus-visible .marca-num {
+        color: var(--gold-soft);
+        transform: translateY(-2px);
+      }
+      .marca:focus-visible {
+        outline: none;
+      }
+      .marca:focus-visible .marca-num {
+        outline: 2px solid var(--gold-soft);
+        outline-offset: 2px;
+      }
+
+      /* Deslizador */
+      input[type="range"] {
+        --p: 0%;
+        -webkit-appearance: none;
+        appearance: none;
+        display: block;
+        width: 100%;
+        height: var(--th);
+        margin: 0;
+        background: transparent;
+        cursor: pointer;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: var(--tr);
+        border-radius: 5px;
+        background: linear-gradient(
+          to right,
+          var(--gold) var(--p),
+          var(--track) var(--p)
+        );
+      }
+      input[type="range"]::-moz-range-track {
+        height: var(--tr);
+        border-radius: 5px;
+        background: var(--track);
+      }
+      input[type="range"]::-moz-range-progress {
+        height: var(--tr);
+        border-radius: 5px;
+        background: var(--gold);
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        box-sizing: border-box;
+        width: max(14px, calc(var(--th) * 0.56));
+        height: var(--th);
+        margin-top: calc((var(--tr) - var(--th)) / 2);
+        border-radius: 10px;
+        background: var(--gold-soft);
+        border: 3px solid var(--bg);
+        box-shadow:
+          0 0 0 2px var(--gold),
+          0 0 16px rgba(230, 184, 74, 0.45);
+        position: relative;
+        z-index: 2;
+      }
+      input[type="range"]::-moz-range-thumb {
+        box-sizing: border-box;
+        width: max(14px, calc(var(--th) * 0.56));
+        height: var(--th);
+        border-radius: 10px;
+        background: var(--gold-soft);
+        border: 3px solid var(--bg);
+        box-shadow:
+          0 0 0 2px var(--gold),
+          0 0 16px rgba(230, 184, 74, 0.45);
+      }
+      input[type="range"]:focus-visible::-webkit-slider-thumb {
+        box-shadow:
+          0 0 0 2px var(--gold),
+          0 0 0 6px rgba(246, 220, 152, 0.4);
+      }
+      input[type="range"]:focus-visible::-moz-range-thumb {
+        box-shadow:
+          0 0 0 2px var(--gold),
+          0 0 0 6px rgba(246, 220, 152, 0.4);
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      @media (min-width: 1001px) {
+        .fila .ctrl {
+          display: contents;
+        }
+      }
+
+      /* ---------- Pantallas estrechas (móvil): aquí se apila y se hace scroll ---------- */
+      @media (max-width: 1000px) {
+        body {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto;
+          grid-template-areas: "notas" "resumen" "criterios";
+        }
+        .panel::before {
+          left: 20px;
+          right: 20px;
+        }
+        .apuntes {
+          height: 220px;
+        }
+        .resumen {
+          padding-bottom: 28px;
+        }
+        .criterios {
+          container-type: normal;
+          min-height: 0;
+          flex: none;
+          grid-auto-flow: row;
+          grid-template-columns: 1fr;
+          grid-template-rows: none;
+          row-gap: 18px;
+        }
+        .fila {
+          --aro: 56px;
+          --btn: 32px;
+          --th: 32px;
+          --tr: 8px;
+          grid-template-columns: var(--aro) 1fr;
+          grid-template-areas:
+            "aro nombre"
+            "ctrl ctrl";
+          row-gap: 6px;
+        }
+        .fila .aro {
+          grid-area: aro;
+        }
+        .fila .nombre {
+          grid-area: nombre;
+        }
+        .fila .ctrl {
+          grid-area: ctrl;
+          display: grid;
+          grid-template-columns: var(--btn) 1fr var(--btn);
+          align-items: center;
+          column-gap: 10px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Arriba a la izquierda: puntos generales -->
+    <section class="panel notas" aria-label="Puntos generales del episodio">
+      <textarea
+        id="apuntes"
+        class="apuntes"
+        placeholder="Evaluaciones generales…"
+        aria-label="Puntos generales del episodio"
+      ></textarea>
+    </section>
+
+    <!-- Arriba a la derecha: total y botón -->
+    <section class="panel resumen" aria-label="Calificación total">
+      <div class="total">
+        <input
+          id="total"
+          type="text"
+          inputmode="decimal"
+          maxlength="5"
+          autocomplete="off"
+          value="0.0"
+          aria-label="Calificación total del episodio (de 0 a 12)"
+          title="Escribe la calificación total del episodio"
+        />
+        <span class="de" aria-hidden="true">/ 12</span>
+      </div>
+      <div class="acciones">
+        <button id="copiar" class="btn-copiar" type="button">
+          Copiar evaluación
+        </button>
+        <button id="reiniciar" class="btn-reiniciar" type="button">
+          Reiniciar
+        </button>
+      </div>
+    </section>
+
+    <!-- Abajo: los 12 criterios -->
+    <section class="panel evaluacion" aria-label="Criterios de evaluación">
+      <div id="criterios" class="criterios"></div>
+      <div id="estado" class="sr-only" role="status" aria-live="polite"></div>
+    </section>
+
+    <script>
+      const CRITERIOS = [
+        { nombre: "Entretenimiento", copia: "Entretenimiento" },
+        { nombre: "Trama", copia: "Trama" },
+        { nombre: "Escenas", copia: "Escenas" },
+        { nombre: "Expectativa", copia: "Expectativa" },
+        { nombre: "Desarrollo", copia: "Desarrollo" },
+        { nombre: "Mejores Momentos", copia: "Mejores momentos" },
+        { nombre: "Música y sonido", copia: "Música y sonido" },
+        { nombre: "Apartado visual", copia: "Apartado visual" },
+        { nombre: "Personajes", copia: "Personajes" },
+        { nombre: "Temática", copia: "Temática" },
+        { nombre: "Impacto", copia: "Impacto" },
+        { nombre: "Puntos Extra", copia: "Puntos extra" },
+      ];
+
+      const MAX = 12;
+      const PASO = 0.1;
+      const MARCAS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; // subdivisiones de salto rápido en cada barra
+
+      const redondear = (n) => Math.round(n * 10) / 10;
+      const limitar = (n) => Math.min(MAX, Math.max(0, n));
+      const fmt = (n) => n.toFixed(1);
+
+      /*
+    Interpreta lo que se escribe en un círculo o en el total:
+      "8"   -> 8.0        "85"  -> 8.5       "12" -> 12.0
+      "05"  -> 0.5        "120" -> 12.0      "125" -> 12.0 (tope)
+      "8.5" o "8,5" -> 8.5 (con punto o coma se toma tal cual)
+    Si el texto no se entiende, se devuelve el valor anterior.
+  */
+      function interpretar(texto, previo) {
+        const t = texto.trim().replace(",", ".");
+        let v;
+        if (/^\d+$/.test(t)) {
+          const n = parseInt(t, 10);
+          if (t.length === 1) v = n;
+          else if (t.length === 2) v = t[0] !== "0" && n <= MAX ? n : n / 10;
+          else v = n / 10;
+        } else if (/^\d*\.\d*$/.test(t) && /\d/.test(t)) {
+          v = parseFloat(t);
+        } else {
+          return previo;
+        }
+        return redondear(limitar(v));
+      }
+
+      function filtrarEntrada(input) {
+        const limpio = input.value.replace(/[^\d.,]/g, "");
+        if (limpio !== input.value) input.value = limpio;
+      }
+
+      const valores = CRITERIOS.map(() => 0);
+      const contenedor = document.getElementById("criterios");
+      const filas = [];
+
+      CRITERIOS.forEach((c, i) => {
+        const fila = document.createElement("div");
+        fila.className = "fila";
+        const marcasHtml = MARCAS.map(
+          (v) =>
+            `<button type="button" class="marca" tabindex="-1" data-valor="${v}" style="left:${(v / MAX) * 100}%" title="Ir a ${fmt(v)}">
+        <span class="marca-num" aria-hidden="true">${v}</span>
+        <span class="marca-linea" aria-hidden="true"></span>
+      </button>`,
+        ).join("");
+        fila.innerHTML = `
+      <div class="aro"><input type="text" inputmode="decimal" maxlength="5" autocomplete="off" value="0.0" aria-label="Calificación de ${c.nombre}"></div>
+      <div class="nombre">${c.nombre}</div>
+      <div class="ctrl">
+        <button class="flecha menos" type="button" aria-label="Bajar 0.1 en ${c.nombre}"></button>
+        <div class="pista">
+          <input type="range" min="0" max="${MAX}" step="${PASO}" value="0" aria-label="${c.nombre}">
+          <div class="marcas">${marcasHtml}</div>
+        </div>
+        <button class="flecha mas" type="button" aria-label="Subir 0.1 en ${c.nombre}"></button>
+      </div>`;
+        contenedor.appendChild(fila);
+
+        const aro = fila.querySelector(".aro");
+        const num = fila.querySelector(".aro input");
+        const slider = fila.querySelector("input[type=range]");
+        filas.push({ aro, num, slider });
+
+        slider.addEventListener("input", () =>
+          fijar(i, parseFloat(slider.value)),
+        );
+
+        // Marcas de salto rápido sobre la barra
+        fila.querySelectorAll(".marca").forEach((m) => {
+          m.addEventListener("click", () =>
+            fijar(i, parseFloat(m.dataset.valor)),
+          );
+        });
+
+        // Número editable dentro del círculo
+        num.addEventListener("focus", () => num.select());
+        num.addEventListener("input", () => filtrarEntrada(num));
+        num.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") num.blur();
+          if (e.key === "Escape") {
+            num.value = fmt(valores[i]);
+            num.blur();
+          }
+        });
+        num.addEventListener("blur", () =>
+          fijar(i, interpretar(num.value, valores[i])),
+        );
+
+        ["menos", "mas"].forEach((tipo) => {
+          const btn = fila.querySelector(".flecha." + tipo);
+          const dir = tipo === "mas" ? 1 : -1;
+          const paso = () => fijar(i, valores[i] + dir * PASO);
+          let espera, repite;
+          const parar = () => {
+            clearTimeout(espera);
+            clearInterval(repite);
+          };
+
+          // Al mantener pulsado, el valor sigue cambiando
+          btn.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            paso();
+            espera = setTimeout(() => {
+              repite = setInterval(paso, 60);
+            }, 380);
+          });
+          ["pointerup", "pointerleave", "pointercancel"].forEach((ev) =>
+            btn.addEventListener(ev, parar),
+          );
+          // Teclado (Enter / Espacio)
+          btn.addEventListener("click", (e) => {
+            if (e.detail === 0) paso();
+          });
+        });
+      });
+
+      function fijar(i, v) {
+        v = redondear(limitar(v));
+        valores[i] = v;
+        const f = filas[i];
+        f.slider.value = v;
+        f.slider.style.setProperty("--p", (v / MAX) * 100 + "%");
+        f.aro.style.setProperty("--p", (v / MAX) * 100);
+        f.num.value = fmt(v);
+      }
+
+      // ---------- Calificación total (la escribe el usuario) ----------
+      const total = document.getElementById("total");
+      let totalValor = 0;
+
+      total.addEventListener("focus", () => total.select());
+      total.addEventListener("input", () => filtrarEntrada(total));
+      total.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") total.blur();
+        if (e.key === "Escape") {
+          total.value = fmt(totalValor);
+          total.blur();
+        }
+      });
+      total.addEventListener("blur", normalizarTotal);
+      total.addEventListener("change", normalizarTotal);
+
+      function normalizarTotal() {
+        totalValor = interpretar(total.value, totalValor);
+        total.value = fmt(totalValor);
+      }
+
+      // ---------- Botones: copiar y reiniciar ----------
+      const btnCopiar = document.getElementById("copiar");
+      const btnReiniciar = document.getElementById("reiniciar");
+      const estado = document.getElementById("estado");
+      const apuntes = document.getElementById("apuntes");
+      let temporizador, temporizadorReinicio;
+
+      function mostrarCopiar(texto = "Copiar evaluación", clase) {
+        clearTimeout(temporizador);
+        btnCopiar.classList.remove("ok", "error");
+        if (clase) btnCopiar.classList.add(clase);
+        btnCopiar.textContent = texto;
+      }
+
+      function mostrarReiniciar(confirmando) {
+        clearTimeout(temporizadorReinicio);
+        btnReiniciar.classList.toggle("confirmar", confirmando);
+        btnReiniciar.textContent = confirmando
+          ? "Seguro puto?"
+          : "Reiniciar";
+      }
+
+      function armarTexto() {
+        normalizarTotal();
+        const lineas = [
+          `Calificación del episodio: ${total.value} / ${MAX}`,
+          "",
+          ...CRITERIOS.map((c, i) => `${c.copia}: ${fmt(valores[i])}/${MAX}`),
+        ];
+        return lineas.join("\n");
+      }
+
+      async function copiarTexto(texto) {
+        try {
+          await navigator.clipboard.writeText(texto);
+          return true;
+        } catch (_) {
+          // Respaldo por si el navegador bloquea la API moderna
+          const ta = document.createElement("textarea");
+          ta.value = texto;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          let ok = false;
+          try {
+            ok = document.execCommand("copy");
+          } catch (_) {}
+          ta.remove();
+          return ok;
+        }
+      }
+
+      function reiniciar() {
+        CRITERIOS.forEach((_, i) => fijar(i, 0));
+        apuntes.value = "";
+        totalValor = 0;
+        total.value = "0.0";
+      }
+
+      btnCopiar.addEventListener("click", async () => {
+        // Si el cursor sigue dentro de un círculo o el total, se confirma antes de copiar
+        if (document.activeElement && document.activeElement !== document.body)
+          document.activeElement.blur();
+
+        const ok = await copiarTexto(armarTexto());
+        if (ok) {
+          mostrarCopiar("¡Copiado!", "ok");
+          estado.textContent = "Evaluación copiada al portapapeles";
+        } else {
+          mostrarCopiar("No se pudo copiar", "error");
+          estado.textContent = "No se pudo copiar la evaluación";
+        }
+        temporizador = setTimeout(() => mostrarCopiar(), 1500);
+      });
+
+      // Reiniciar pide un segundo clic para no borrar todo por accidente
+      btnReiniciar.addEventListener("click", () => {
+        if (!btnReiniciar.classList.contains("confirmar")) {
+          mostrarReiniciar(true);
+          temporizadorReinicio = setTimeout(() => mostrarReiniciar(false), 3000);
+          return;
+        }
+        reiniciar();
+        mostrarReiniciar(false);
+        mostrarCopiar();
+        estado.textContent = "Evaluación reiniciada";
+      });
+      btnReiniciar.addEventListener("blur", () => mostrarReiniciar(false));
+
+      CRITERIOS.forEach((_, i) => fijar(i, 0));
+    </script>
+  </body>
+</html>
